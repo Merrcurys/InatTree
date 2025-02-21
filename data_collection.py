@@ -1,37 +1,31 @@
 import math
 import requests
-from Node import Node
 import os
-from tqdm import tqdm
 import pickle
-from dotenv import load_dotenv
 import time
+from tqdm import tqdm
+from Node import Node
 
-load_dotenv()
-
+# Создаем сессию для выполнения HTTP-запросов
 session = requests.Session()
 session.mount("https://", requests.adapters.HTTPAdapter(max_retries=10))
 
+BASE_URL = 'https://api.inaturalist.org/v1/'
+username = 'merrcurys'  # Имя пользователя для запроса наблюдений
+taxon_id = 3  # ID таксона (в данном случае - птицы)
+headers = {'Accept': 'application/json'}
+
 
 def create_nodes(t_id, nodes):
-    res = session.get(BASE_URL + 'taxa' + '?taxon_id=' +
-                      str(t_id) + '&locale=RU', headers=headers)
-    taxon = res.json()['results'][0]
-    parent_id = taxon['parent_id']
+    # Получаем информацию о таксоне по его ID
+    res = session.get(
+        f"{BASE_URL}taxa?taxon_id={t_id}&locale=RU", headers=headers)
+    taxon = res.json()['results'][0]  # Извлекаем первый результат
+    parent_id = taxon['parent_id']  # Получаем ID родительского таксона
+    photo_url = taxon.get('default_photo', {}).get(
+        'square_url')  # URL для фотографии таксона
 
-    try:
-        photo_url = taxon['default_photo']['square_url']
-    except:
-        photo_url = None
-
-    is_species = taxon['rank_level'] <= 10
-
-    # Создание папки для фото
-    if not os.path.exists('photos'):
-        os.makedirs('photos')
-
-    # Загрузка фото для видов
-    if is_species and photo_url:
+    if taxon['rank_level'] <= 10 and photo_url:
         photo_path = os.path.abspath(f'photos/{t_id}.png')
         if not os.path.exists(photo_path):
             try:
@@ -42,59 +36,55 @@ def create_nodes(t_id, nodes):
                 else:
                     print(f"Ошибка загрузки фото {t_id}: {photo.status_code}")
             except Exception as e:
-                print(f"Ошибка при загрузке фото {t_id}: {str(e)}")
+                print(f"Ошибка при загрузке фото {t_id}: {e}")
 
-    # Получение названия
+    # Получаем имя таксона, либо его предпочитаемое общее название
     name = taxon.get('preferred_common_name', taxon['name'])
-
+    # Создаем узел для таксона и добавляем его в словарь
     nodes[t_id] = Node(t_id, name, parent_id if t_id !=
-                       3 else None, is_species)
+                       taxon_id else None, taxon['rank_level'] <= 10)
 
-    # Рекурсивное создание родительских узлов
-    while parent_id not in nodes and t_id != taxon_id:
+    # Рекурсивно создаем узлы для родительских таксонов, если они не добавлены
+    if parent_id not in nodes and t_id != taxon_id:
         create_nodes(parent_id, nodes)
 
 
-def save_nodes(nodes, filename=None):
-    filename = filename or os.getenv("pkl_file_name", "nodes.pkl")
+def save_nodes(nodes, filename="nodes.pkl"):
     with open(filename, "wb") as file:
         pickle.dump(nodes, file)
 
 
-if __name__ == '__main__':
-    BASE_URL = 'https://api.inaturalist.org/v1/'
-    username = 'merrcurys'
-    taxon_id = 3  # Птицы
-    headers = {'Accept': 'application/json'}
-
-    # Получение списка наблюдений
-    res = requests.get(BASE_URL + 'observations',
-                       params={'user_login': username, 'taxon_id': taxon_id},
-                       headers=headers)
-
+def fetch_observations():
+    res = requests.get(f"{BASE_URL}observations", params={
+                       'user_login': username, 'taxon_id': taxon_id}, headers=headers)
     total_observations = res.json()['total_results']
     per_page = res.json()['per_page']
-    taxs_id = set()
+    return total_observations, per_page
 
-    # Сбор ID таксонов
+
+def main():
+    # Создаем папку для сохранения фотографий, если она не существует
+    os.makedirs('photos', exist_ok=True)
+
+    # Получаем общее количество наблюдений и количество на странице
+    total_observations, per_page = fetch_observations()
+    taxs_id = set()  # Множество для хранения уникальных ID таксонов
+
+    # Запрашиваем данные по страницам
     for i in tqdm(range(1, math.ceil(total_observations / per_page) + 1)):
-        res_page = requests.get(BASE_URL + 'observations',
-                                params={
-                                    'user_login': username,
-                                    'taxon_id': taxon_id,
-                                    'page': i,
-                                    'locale': 'RU'
-                                },
-                                headers=headers)
-        for item in res_page.json()['results']:
-            taxs_id.add(item['taxon']['id'])
+        res_page = requests.get(f"{BASE_URL}observations", params={
+                                'user_login': username, 'taxon_id': taxon_id, 'page': i, 'locale': 'RU'}, headers=headers)
+        # Обновляем множество уникальных таксонов
+        taxs_id.update(item['taxon']['id']
+                       for item in res_page.json()['results'])
 
-    # Создание узлов
-    nodes = dict()
+    nodes = {}  # Словарь для хранения узлов
     for t_id in tqdm(taxs_id):
-        create_nodes(t_id, nodes)
-        time.sleep(1)  # Ограничение запросов
+        create_nodes(t_id, nodes)  # Создаем узлы для каждого таксона
 
     save_nodes(nodes)
-    print(
-        f"Сохранено {len(nodes)} узлов в файл {os.getenv('pkl_file_name', 'nodes.pkl')}")
+    print(f"Сохранено {len(nodes)} узлов в файл nodes.pkl")
+
+
+if __name__ == "__main__":
+    main()
