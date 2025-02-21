@@ -25,7 +25,7 @@ def run_script(script_name):
 
 
 def clear_photos_folder():
-    folder = 'photos'
+    folder = 'input/photos'
     if os.path.exists(folder):
         for filename in os.listdir(folder):
             file_path = os.path.join(folder, filename)
@@ -49,7 +49,7 @@ def main():
             run_script("data_collection.py")
 
         elif choice == '2':
-            if not os.path.exists("nodes.pkl"):
+            if not os.path.exists("input/nodes.pkl"):
                 print("\n⚠️  Файл данных не найден! Сначала выполните сбор данных.")
                 continue
             run_script("drawio_generator.py")

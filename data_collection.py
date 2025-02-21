@@ -2,7 +2,7 @@ import math
 import requests
 import os
 import pickle
-# import time
+import time
 from tqdm import tqdm
 
 from Node import Node
@@ -21,24 +21,40 @@ def create_nodes(t_id, nodes):
     """Рекурсивно создает узлы таксонов и их родителей, загружает фото"""
     # Получаем информацию о таксоне по его ID
     res = session.get(
-        f"{BASE_URL}taxa?taxon_id={t_id}&locale=RU", headers=headers)
+        f"{BASE_URL}taxa?taxon_id={t_id}&locale=RU", headers=headers, timeout=600)
+
+    if res.status_code == 429:  # 100 запросов в минуту
+        print(
+            f"\nПревышен лимит запросов в минуту на одного пользователя. Подождем минуту и продолжим.")
+        time.sleep(60)
+        return create_nodes(t_id, nodes)
+
     taxon = res.json()['results'][0]  # Извлекаем первый результат
     parent_id = taxon['parent_id']  # Получаем ID родительского таксона
     photo_url = taxon.get('default_photo', {}).get(
         'square_url')  # URL для фотографии таксона
 
     if taxon['rank_level'] <= 10 and photo_url:
-        photo_path = os.path.abspath(f'photos/{t_id}.png')
+        photo_path = os.path.abspath(f'input/photos/{t_id}.png')
         if not os.path.exists(photo_path):
             try:
-                photo = requests.get(photo_url, timeout=10)
+                photo = requests.get(photo_url, timeout=600)
+
+                # При превышении лимита возвращается статус 429 Too Many Requests.
+                if photo.status_code == 429:  # 100 запросов в минуту
+                    print(
+                        f"\nПревышен лимит запросов в минуту на одного пользователя. Подождем минуту и продолжим.")
+                    time.sleep(60)
+                    return create_nodes(t_id, nodes)
+
                 if photo.status_code == 200:
                     with open(photo_path, 'wb') as file:
                         file.write(photo.content)
                 else:
-                    print(f"Ошибка загрузки фото {t_id}: {photo.status_code}")
+                    print(
+                        f"\nОшибка загрузки фото {t_id}: {photo.status_code}")
             except Exception as e:
-                print(f"Ошибка при загрузке фото {t_id}: {e}")
+                print(f"\nОшибка при загрузке фото {t_id}: {e}")
 
     # Получаем имя таксона, либо его предпочитаемое общее название
     name = taxon.get('preferred_common_name', taxon['name'])
@@ -51,7 +67,7 @@ def create_nodes(t_id, nodes):
         create_nodes(parent_id, nodes)
 
 
-def save_nodes(nodes, filename="nodes.pkl"):
+def save_nodes(nodes, filename="input/nodes.pkl"):
     """Сохраняет узлы в файл"""
     with open(filename, "wb") as file:
         pickle.dump(nodes, file)
@@ -69,7 +85,7 @@ def fetch_observations():
 def main():
     """Основная логика: сбор данных наблюдений, создание узлов таксонов, сохранение"""
     # Создаем папку для сохранения фотографий, если она не существует
-    os.makedirs('photos', exist_ok=True)
+    os.makedirs('input/photos', exist_ok=True)
 
     # Получаем общее количество наблюдений и количество на странице
     total_observations, per_page = fetch_observations()

@@ -5,7 +5,7 @@ import os
 import base64
 
 
-def load_nodes(filename="nodes.pkl"):
+def load_nodes(filename="input/nodes.pkl"):
     """Загружает узлы дерева из pickle-файла"""
     with open(filename, 'rb') as file:
         return pickle.load(file)
@@ -38,7 +38,7 @@ def create_base_xml_structure():
 
 def generate_photo_html(node_id):
     """Генерирует HTML для отображения фотографии вида"""
-    photo_path = f"photos/{node_id}.png"
+    photo_path = f"input/photos/{node_id}.png"
     if not os.path.exists(photo_path):
         return ""
 
@@ -146,5 +146,6 @@ def create_drawio_xml(nodes, output_filename):
 
 if __name__ == '__main__':
     nodes = load_nodes()
-    create_drawio_xml(nodes, 'taxon_tree.drawio')
+    os.makedirs('output', exist_ok=True)
+    create_drawio_xml(nodes, 'output/taxon_tree.drawio')
     print("Файл готов! Откройте taxon_tree.drawio в draw.io и используйте авто-расположение.")
