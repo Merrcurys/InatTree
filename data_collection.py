@@ -2,8 +2,9 @@ import math
 import requests
 import os
 import pickle
-import time
+# import time
 from tqdm import tqdm
+
 from Node import Node
 
 # Создаем сессию для выполнения HTTP-запросов
@@ -17,6 +18,7 @@ headers = {'Accept': 'application/json'}
 
 
 def create_nodes(t_id, nodes):
+    """Рекурсивно создает узлы таксонов и их родителей, загружает фото"""
     # Получаем информацию о таксоне по его ID
     res = session.get(
         f"{BASE_URL}taxa?taxon_id={t_id}&locale=RU", headers=headers)
@@ -50,11 +52,13 @@ def create_nodes(t_id, nodes):
 
 
 def save_nodes(nodes, filename="nodes.pkl"):
+    """Сохраняет узлы в файл"""
     with open(filename, "wb") as file:
         pickle.dump(nodes, file)
 
 
 def fetch_observations():
+    """Возвращает общее число наблюдений и количество на странице"""
     res = requests.get(f"{BASE_URL}observations", params={
                        'user_login': username, 'taxon_id': taxon_id}, headers=headers)
     total_observations = res.json()['total_results']
@@ -63,6 +67,7 @@ def fetch_observations():
 
 
 def main():
+    """Основная логика: сбор данных наблюдений, создание узлов таксонов, сохранение"""
     # Создаем папку для сохранения фотографий, если она не существует
     os.makedirs('photos', exist_ok=True)
 
