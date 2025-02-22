@@ -21,49 +21,46 @@ def create_nodes(t_id, nodes):
     """Рекурсивно создает узлы таксонов и их родителей, загружает фото"""
     # Получаем информацию о таксоне по его ID
     res = session.get(
-        f"{BASE_URL}taxa?taxon_id={t_id}&locale=RU", headers=headers, timeout=600)
+        f"{BASE_URL}taxa?taxon_id={t_id}&locale=RU",
+        headers=headers,
+        timeout=600
+    )
 
-    if res.status_code == 429:  # 100 запросов в минуту
-        print(
-            f"\nПревышен лимит запросов в минуту на одного пользователя. Подождем минуту и продолжим.")
+    if res.status_code == 429:  # >100 запросов в минуту
+        print(f"\nПревышен лимит запросов в минуту на одного пользователя. Подождем минуту и продолжим.")
         time.sleep(60)
         return create_nodes(t_id, nodes)
 
-    taxon = res.json()['results'][0]  # Извлекаем первый результат
-    parent_id = taxon['parent_id']  # Получаем ID родительского таксона
-    photo_url = taxon.get('default_photo', {}).get(
-        'square_url')  # URL для фотографии таксона
+    taxon = res.json()['results'][0]
+    parent_id = taxon['parent_id']
+    photo_url = taxon.get('default_photo', {}).get('square_url')
 
+    # Загрузка фото
     if taxon['rank_level'] <= 10 and photo_url:
         photo_path = os.path.abspath(f'input/photos/{t_id}.png')
         if not os.path.exists(photo_path):
             try:
                 photo = requests.get(photo_url, timeout=600)
 
-                # При превышении лимита возвращается статус 429 Too Many Requests.
-                if photo.status_code == 429:  # 100 запросов в минуту
-                    print(
-                        f"\nПревышен лимит запросов в минуту на одного пользователя. Подождем минуту и продолжим.")
+                if photo.status_code == 429:  # >100 запросов в минуту
+                    print(f"\nПревышен лимит запросов в минуту на одного пользователя. Подождем минуту и продолжим.")
                     time.sleep(60)
                     return create_nodes(t_id, nodes)
 
                 if photo.status_code == 200:
-                    with open(photo_path, 'wb') as file:
-                        file.write(photo.content)
-                else:
-                    print(
-                        f"\nОшибка загрузки фото {t_id}: {photo.status_code}")
+                    with open(photo_path, 'wb') as f:
+                        f.write(photo.content)
+
             except Exception as e:
-                print(f"\nОшибка при загрузке фото {t_id}: {e}")
+                print(f"Ошибка при загрузке фото {t_id}: {e}")
 
     # Получаем имя таксона, либо его предпочитаемое общее название
     name = taxon.get('preferred_common_name', taxon['name'])
     # Создаем узел для таксона и добавляем его в словарь
-    nodes[t_id] = Node(t_id, name, parent_id if t_id !=
-                       taxon_id else None, taxon['rank_level'] <= 10)
+    nodes[t_id] = Node(t_id, name, parent_id, taxon['rank_level'] <= 10)
 
-    # Рекурсивно создаем узлы для родительских таксонов, если они не добавлены
-    if parent_id not in nodes and t_id != taxon_id:
+    # Рекурсия для родителя, если он существует и еще не обработан
+    if parent_id is not None and parent_id not in nodes:
         create_nodes(parent_id, nodes)
 
 
