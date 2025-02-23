@@ -61,28 +61,50 @@ def generate_photo_html(node_id):
 
 def create_node_element(root, node_id, node):
     """Создаёт XML-элемент для узла дерева"""
+    has_photo = os.path.exists(f"input/photos/{node_id}.png")
+    is_species = node.is_species
+
+    # Стилевые настройки
     style = {
         'shape': 'rectangle',
         'html': '1',
         'whiteSpace': 'wrap',
-        'fillColor': '#dae8fc' if node.is_species else '#d5e8d4',
-        'strokeColor': '#6c8ebf' if node.is_species else '#82b366',
-        'verticalAlign': 'top',
+        'fillColor': '#ffffff',
+        'strokeColor': '#000000',
+        'verticalAlign': 'top' if has_photo else 'middle',
         'labelPosition': 'center',
-        'spacingTop': '10',
-        'fontSize': '14'
+        'spacingTop': '10' if has_photo else '0',
+        'fontSize': '14',
+        'rounded': '1'  # Закругление углов
     }
 
-    width = 140 if node.is_species else 160
-    height = 180 if node.is_species else 60
+    # Размеры карточки
+    base_width = 160 if is_species else 180
+    base_height = 180 if is_species else 60
+
+    # Увеличиваем высоту для карточек с фото
+    if has_photo:
+        base_height += 40 if is_species else 20
+
+    # Генерация HTML-контента
+    photo_html = generate_photo_html(node_id) if has_photo else ""
+    text_style = [
+        "padding: 8px",
+        "font-family: Arial",
+        "color: #2c3e50",
+        "text-align: center",
+        "word-wrap: break-word",
+        "width: 100%",
+        "box-sizing: border-box"
+    ]
 
     cell = ET.SubElement(root, 'mxCell', {
         'id': f'node_{node_id}',
         'value': f'''
         <html>
-            <body style="margin:0;padding:0">
-                {generate_photo_html(node_id)}
-                <div style="padding: 8px; font-family: Arial; color: {'#2c3e50' if node.is_species else '#2d4722'}">
+            <body style="margin:0;padding:0;height:100%;width:100%">
+                {photo_html}
+                <div style="{';'.join(text_style)}">
                     {node.name}
                 </div>
             </body>
@@ -94,8 +116,8 @@ def create_node_element(root, node_id, node):
     })
 
     ET.SubElement(cell, 'mxGeometry', {
-        'width': str(width),
-        'height': str(height),
+        'width': str(base_width),
+        'height': str(base_height),
         'as': 'geometry'
     })
 
