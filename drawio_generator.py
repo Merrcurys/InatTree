@@ -25,7 +25,6 @@ def load_nodes(filename="input/nodes.pkl"):
         if not current:
             break
 
-    # Удаляем ненужные узлы (Жизнь и все вышестоящие)
     filtered_nodes = {
         k: v for k, v in nodes.items()
         if k not in to_delete and v.name != "Жизнь"
@@ -88,9 +87,8 @@ def create_node_element(root, node_id, node):
     """Создаёт XML-элемент для узла"""
     has_photo = os.path.exists(f"input/photos/{node_id}.png")
     is_species = node.is_species
-    is_birds = node.name == "Птицы"  # Убедитесь, что название точно совпадает
+    is_birds = node.name == "Птицы"
 
-    # Стилевые настройки для Птиц
     style = {
         'shape': 'rectangle',
         'html': '1',
@@ -100,22 +98,20 @@ def create_node_element(root, node_id, node):
         'verticalAlign': 'middle',
         'labelPosition': 'center',
         'spacingTop': '10' if has_photo else '0',
-        'fontSize': '22' if is_birds else '14'  # Немного уменьшили размер шрифта
+        'fontSize': '22' if is_birds else '14'
     }
 
-    # Размеры карточки
     if is_birds:
-        width, height = 200, 200  # Новый размер квадрата
+        width, height = 200, 200
     else:
         width = 160 if is_species else 180
         base_height = 180 if is_species else 60
         height = base_height + \
             (40 if has_photo and is_species else 20 if has_photo else 0)
 
-    # Генерация HTML-контента
     photo_html = generate_photo_html(node_id) if has_photo else ""
     text_style = [
-        "padding: 15px" if is_birds else "padding: 8px",  # Уменьшенный padding
+        "padding: 15px" if is_birds else "padding: 8px",
         "font-family: Arial",
         "color: #2c3e50",
         "text-align: center",
@@ -127,7 +123,7 @@ def create_node_element(root, node_id, node):
         "align-items: center",
         "justify-content: center",
         "height: 100%",
-        "line-height: 1.2"  # Добавлено для лучшего межстрочного интервала
+        "line-height: 1.2"
     ]
 
     cell = ET.SubElement(root, 'mxCell', {
@@ -187,7 +183,6 @@ def create_drawio_xml(nodes, output_filename):
 
     create_edges(root, nodes)
 
-    # Автоматическое расположение
     arrange = ET.SubElement(root, 'mxCell', {
         'id': 'arrange',
         'style': 'tree;verticalTree=1;vertical=1;horizontal=0;resizeParent=1;',
@@ -196,7 +191,6 @@ def create_drawio_xml(nodes, output_filename):
     })
     ET.SubElement(arrange, 'mxGeometry', {'as': 'geometry'})
 
-    # Сохранение файла
     xml_str = ET.tostring(mxfile)
     xml_pretty = minidom.parseString(xml_str).toprettyxml(indent='  ')
     with open(output_filename, 'w', encoding='utf-8') as f:
